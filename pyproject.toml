@@ -1,0 +1,22 @@
+[project]
+name = "concord"
+version = "0.1.0"
+description = "GenLayer Intelligent Contract primitive that makes observation equivocation a first-class, on-chain, attributable event."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "genlayer-test[sim]==0.28.0",
+    "genvm-linter==0.10.0",
+    "requests==2.31.0",
+    "python-dotenv==1.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+package = false

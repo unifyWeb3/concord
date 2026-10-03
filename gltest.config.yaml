@@ -1,0 +1,10 @@
+networks:
+  default: localnet
+  localnet:
+    url: http://127.0.0.1:4001/api
+    chain_type: localnet
+    leader_only: true
+    default_wait_retries: 60
+    default_wait_interval: 2
+paths:
+  contracts: contracts

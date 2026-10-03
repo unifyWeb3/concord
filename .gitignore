@@ -1,0 +1,26 @@
+# secrets — never commit. Absolute rule from BRIEF.md §3.
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+.venv-deploy/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# node
+node_modules/
+
+# genlayer / gltest
+.genlayer/
+gltest-results/
+*.log
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
