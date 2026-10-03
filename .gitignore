@@ -24,3 +24,7 @@ gltest-results/
 .DS_Store
 .idea/
 .vscode/
+# harness equivocation artifact: a deliberately corrupted fetch, regenerable with
+# scripts/observe.py --report-harness. Not delivery content -- a reviewer should reproduce
+# it, not receive it. See state/LEFT-OFF.md and docs/CONSENSUS.md section 6.
+artifacts/

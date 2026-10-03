@@ -7,6 +7,8 @@ fails. `conftest.run_round` replays that documented rule on top of the harness s
 state-level assertions.
 """
 
+import hashlib
+
 import pytest
 from gltest.direct import pytest_plugin  # noqa: F401
 
@@ -236,23 +238,84 @@ def test_a_report_is_rejected_when_the_admitted_digest_no_longer_matches(concord
 	assert concord.equivocation_count(SUBJECT) == 0
 
 
+def test_an_oversized_artifact_is_rejected_not_truncated(concord, vm):
+	"""Regression test for a defect found on chain, not in review.
+
+	The first deployed version truncated the artifact at 6000 characters. A real Base Sepolia
+	receipt is ~14.7 KB, so the truncated prefix did not parse, reduced to the UNPARSEABLE
+	not-found digest, and the chain recorded that as the "divergent signature". The recorded
+	divergence was an artefact of the size limit, and it named a validator for it.
+
+	Truncation is worse than useless here: it converts the reporter's upload size into a claim
+	about someone else's honesty. Over-long is now rejected outright.
+	"""
+	run_round(concord, vm, SUBJECT, RPC_VIEW_A, RPC_VIEW_B)
+	serve(vm, RPC_VIEW_B)
+
+	import sys
+
+	# The limit is read from the module, not hard-coded, so this test cannot drift away from the
+	# contract and start passing for an unrelated reason.
+	mod = sys.modules["_contract_concord"]
+	oversized = '{"pad":"' + "a" * (mod.MAX_ARTIFACT_CHARS + 10) + '","receipt":{"status":"0x0"}}'
+	with pytest.raises(Exception, match="artifact too long"):
+		concord.report_equivocation(SUBJECT, VALIDATOR, oversized)
+
+	assert concord.equivocation_count(SUBJECT) == 0
+	assert concord.get_equivocations(SUBJECT) == {}, "nothing may be recorded for a rejected artifact"
+
+
+def test_a_realistic_sized_artifact_is_accepted_and_recorded_verbatim(concord, vm):
+	"""The complement of the test above: an artifact of realistic receipt size must round-trip.
+
+	The payload is RPC_DIVERGENT_TOPIC -- a genuine divergent reduction -- padded out past the
+	size limit with a third batch entry the reduction ignores (only ids 1 and 2 are honoured).
+	So it is large, valid, and reduces to something different from the admitted digest; if the
+	artifact were still being truncated, this would fail.
+	"""
+	import json
+
+	padded = json.dumps(
+		json.loads(RPC_DIVERGENT_TOPIC) + [{"id": 3, "result": {"padding": "a" * 8000}}]
+	)
+	run_round(concord, vm, SUBJECT, RPC_VIEW_A, RPC_VIEW_B)
+	serve(vm, RPC_VIEW_B)
+	concord.report_equivocation(SUBJECT, VALIDATOR, padded)
+	slot = SUBJECT + "/" + VALIDATOR_LOWER
+	assert concord.equivocations[slot].artifact_sha256 == hashlib.sha256(
+		padded.encode("utf-8")
+	).hexdigest()
+
+
 def test_a_forged_artifact_cannot_manufacture_a_divergence(concord, vm):
 	"""An empty or malformed artifact reduces to the not-found digest, which differs from the
 	canonical one -- so this DOES record. What it records is the truth: that artifact reduces
 	to something that is not this subject. It cannot claim the canonical signature."""
+	import sys
+
 	run_round(concord, vm, SUBJECT, RPC_VIEW_A, RPC_VIEW_B)
 	serve(vm, RPC_VIEW_B)
 	recorded = concord.report_equivocation(SUBJECT, VALIDATOR, "not json")
-	import sys
-
 	mod = sys.modules["_contract_concord"]
 	assert recorded == mod.digest_from_artifact("not json")["signature"]
 	assert recorded != concord.get_observation(SUBJECT).signature
 
 
-def test_the_artifact_fingerprint_is_recorded_so_a_third_party_can_recheck(concord, vm):
-	import hashlib
+def test_a_malformed_artifact_is_recorded_as_unparseable_not_as_the_real_field(concord, vm):
+	"""The distinction the truncation bug blurred: an unparseable artifact must say so in the
+	recorded digest, so a reader can tell a bad upload from a genuine divergent reduction."""
+	import sys
 
+	run_round(concord, vm, SUBJECT, RPC_VIEW_A, RPC_VIEW_B)
+	serve(vm, RPC_VIEW_B)
+	mod = sys.modules["_contract_concord"]
+	recorded = concord.report_equivocation(SUBJECT, VALIDATOR, "not json")
+	stored = concord.equivocations[SUBJECT + "/" + VALIDATOR_LOWER].digest
+	assert "UNPARSEABLE" in stored
+	assert stored == mod.canonical_string(mod.digest_from_artifact("not json"))
+
+
+def test_the_artifact_fingerprint_is_recorded_so_a_third_party_can_recheck(concord, vm):
 	run_round(concord, vm, SUBJECT, RPC_VIEW_A, RPC_VIEW_B)
 	serve(vm, RPC_VIEW_B)
 	vm.sender = REPORTER

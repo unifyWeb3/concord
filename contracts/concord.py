@@ -97,7 +97,12 @@ DIGEST_SCHEMA = "concord/evm-tx-digest@1"
 
 SUBJECT_PREFIX = "evm:"
 SUBJECT_SEPARATOR = "/"
-MAX_ARTIFACT_CHARS = 6000
+# Bound on the reporter-supplied artifact. This was 6000 in the first deployed version, and a
+# real Base Sepolia receipt is ~14.7 KB -- so the artifact was being cut mid-string, failed to
+# parse, and the recorded "divergence" was the UNPARSEABLE digest rather than the corrupted
+# field. A bound that is too small does not degrade the feature, it silently replaces it.
+# Verified on chain, not reasoned about: see state/LEFT-OFF.md.
+MAX_ARTIFACT_CHARS = 60000
 MAX_LABEL_CHARS = 200
 
 # Field order is part of the wire format. The canonical string is a join over exactly this
@@ -685,7 +690,15 @@ class Concord(gl.Contract):
 		"""
 		key = _validate_subject(subject)
 		validator = _validate_address(attributed_to)
-		artifact = artifact_json[:MAX_ARTIFACT_CHARS]
+		# Reject an over-long artifact outright rather than truncating it. Truncation produces
+		# unparseable JSON, which reduces to the UNPARSEABLE digest -- so an over-long artifact
+		# would be recorded as a divergence that is really just a size limit, blaming a
+		# validator for the reporter's upload size.
+		if len(artifact_json) > MAX_ARTIFACT_CHARS:
+			raise gl.vm.UserError(
+				f"artifact too long: {len(artifact_json)} > {MAX_ARTIFACT_CHARS} characters"
+			)
+		artifact = artifact_json
 
 		agreed = self._agree(key)
 
