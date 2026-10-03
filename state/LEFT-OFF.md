@@ -10,7 +10,8 @@ Updated 2026-10-03. Project: **Concord**, a GenLayer Intelligent Contract primit
 | Explorer | <https://explorer-studio.genlayer.com/address/0x7c01a7c38c04f4BE6f66a967a5EaB26f73c48F87> |
 | Deploy tx | `0xd8c03ca8f077182a104c667e162daa8fef7260519bae2885be11d713eee4d4ec` — FINALIZED, `MAJORITY_AGREE` |
 | Admitted observation tx | `0xb0a917626fe501eb2a70bfff981c483d702072075f8dddd61921adf36168172c` — FINALIZED |
-| Equivocation record tx | `0x03b29a6d2fcc694f9c8acb83e8305fbc8d97277fc10b18909371f493c9e97527` — FINALIZED |
+| Equivocation record tx | `0x03b29a6d2fcc694f9c8acb83e8305fbc8d97277fc10b18909371f493c9e97527` — FINALIZED
+Second record tx | `0x2274320c9263f346656789fc6ffdf7172f4bf090c9271e954503501d370a6581` — FINALIZED |
 | Admitted signature | `66ae60fa7a112ae0ca54f025f40c57dc346528aed674746c3133d1d68e01e54d` |
 | Divergent signature | `173664f45f52567485456cd2eea29e6b4a644ccf04e4aca4d7be9ad3bbc3bac2` |
 
@@ -181,7 +182,24 @@ Cause: the network path from this host to the GenLayer node. `verify_live.py` re
 and reports it as a transport failure, never as a contract failure. Same class of defect as
 `../mys`'s recurring "a call that reports a result contradicting reality".
 
-### 6. `genlayer-py` did **not** have the reported live-read defect
+### 6. A second, independent equivocation record on chain
+
+Two records now exist for the demo subject, from two separately corrupted artifacts, attributed
+to two different labels:
+
+| tx | attributed to | corrupted field | recorded signature |
+|---|---|---|---|
+| `0x03b29a6d…e97527` | `0x…dead` | `receipt.status` `0x1`→`0x0` | `173664f45f52567485456cd2eea29e6b4a644ccf04e4aca4d7be9ad3bbc3bac2` |
+| `0x2274320c…706581` | `0x…badc` | dropped one log entry (2→1) | `c158a5dc505b87c84b7cfacc19ab88b65b5fcdd6f9ef0ce58b217060684ae079` |
+
+`equivocation_count` is 2 and `get_equivocations` returns one row per address, confirming
+per-address attribution rather than a single running total.
+
+**Both are manufactured.** Same rule as the first: deliberately corrupted fetch, labelled, not
+evidence of a byzantine node. Run to prove attribution is per-address and that a second, different
+divergence is recorded independently — not to claim a real adversarial event.
+
+### 7. `genlayer-py` did **not** have the reported live-read defect
 
 `../mys/state/MEMORY.md` records genlayer-py 0.18.0 reporting `Contract 0x… not found` for a live
 Studionet contract that `genlayer-js` reads — reproduced twice there. That did **not** reproduce
