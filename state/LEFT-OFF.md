@@ -60,7 +60,7 @@ tests, `.venv-deploy` (`genlayer-py` 0.18.0) for deploy and verify. Not intercha
 
 ## Do not
 
-- Do not use `GENLAYER_EXPLORER_URL`. It points at Bradbury (4221) and renders an empty page with
+- Do not use `GENLAYER_EXPLORER_URL`. It points at Bradbury, a different chain, and renders an empty page with
   HTTP 200. Studionet is `explorer-studio.genlayer.com`, path `/address/<addr>`, hardcoded in
   `scripts/deploy.py`.
 - Do not deploy to studio-dev (61997). Fee-charging, and every deploy returns

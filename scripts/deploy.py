@@ -10,7 +10,7 @@ real time:
 2. **Two virtualenvs, deliberately.** The test venv pins genlayer-py 0.9.0 via
    genlayer-test; this script needs genlayer-py 0.18.0. Run it with `.venv-deploy`.
 
-3. **Do not use GENLAYER_EXPLORER_URL.** It points at Bradbury (4221) and renders an empty
+3. **Do not use GENLAYER_EXPLORER_URL.** It points at Bradbury, a different chain, and renders an empty
    page while returning HTTP 200. Studionet's explorer is explorer-studio.genlayer.com with
    path /address/<addr>, and it is hardcoded below rather than read from the environment.
 
@@ -31,13 +31,18 @@ import sys
 import time
 from pathlib import Path
 
+from genlayer_py.chains.studionet import studionet as _sn
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_PATH = REPO_ROOT / "contracts" / "concord.py"
 
 # Hardcoded rather than read from .env, for the reason in the module docstring: the env var
 # points at Bradbury and renders an empty page with HTTP 200.
 EXPLORER_BASE = "https://explorer-studio.genlayer.com"
-EXPECTED_CHAIN_ID = 61999
+
+# Taken from the SDK's own chain definition rather than written as a literal, so the guard cannot
+# drift from the network the client is actually configured for.
+EXPECTED_CHAIN_ID = _sn.id
 
 STATUS_ORDER = ["PENDING", "NEW", "UNDETERMINED", "ACCEPTED", "FINALIZED"]
 
