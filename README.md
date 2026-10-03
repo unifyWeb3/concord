@@ -1,11 +1,15 @@
 # Concord
 
-**Equivocation as a first-class, on-chain, attributable event.**
+**Equivocation as a first-class, on-chain, committee-attested event.**
 
 Concord is a GenLayer Intelligent Contract primitive. It fetches a subject, reduces it to a
 canonical digest, and admits it **only if the leader and every validator independently computed
-the same signature**. Any disagreement is caught, and — separately — recorded as an attributed
-equivocation event.
+the same signature**. Any disagreement aborts the round, and a separate committee-gated
+transaction records the divergent signature.
+
+What the committee can attest is *that* a signature diverges, unanimously. It cannot attest
+*who* produced it, because GenVM exposes no validator address to contract code. See
+[Limitations](#limitations). The address stored with a record is the reporter's label.
 
 There is no model in the correctness path. Agreement is arithmetic over digests.
 
@@ -13,7 +17,7 @@ There is no model in the correctness path. Agreement is arithmetic over digests.
 |---|---|
 | **Network** | Studionet, chain **61999** |
 | **Contract** | [`0x7c01a7c38c04f4BE6f66a967a5EaB26f73c48F87`](https://explorer-studio.genlayer.com/address/0x7c01a7c38c04f4BE6f66a967a5EaB26f73c48F87) |
-| **Deploy tx** | [`0xd8c03ca8f077182a104c667e162daa8fef7260519bae2885be11d713eee4d4ec`](https://explorer-studio.genlayer.com/tx/0xd8c03ca8f077182a104c667e162daa8fef7260519bae2885be11d713eee4d4ec) — FINALIZED, `MAJORITY_AGREE` |
+| **Deploy tx** | [`0xd8c03ca8…4d4ec`](https://explorer-studio.genlayer.com/tx/0xd8c03ca8f077182a104c667e162daa8fef7260519bae2885be11d713eee4d4ec), FINALIZED, `MAJORITY_AGREE` |
 | **Reads a** | Base Sepolia, `evm:` subjects, via a public JSON-RPC endpoint (no API key, $0) |
 | **Tests** | 61 hermetic, no network |
 | **Cost** | $0 |
@@ -30,7 +34,7 @@ intelligent contract is built wrong.
 
 The mitigation is known and unglamorous: only fields **fixed for a given subject forever** may
 cross the boundary. Block number, gas, timestamps and raw bodies must be quantised away or
-dropped. Band them — `value=ZERO`, `logs=MANY` — keep the band, discard the measurement.
+dropped. Band them (`value=ZERO`, `logs=MANY`), keep the band, discard the measurement.
 
 **Nobody packages this.** Cordon, a sibling project, does the reduction and then:
 
@@ -53,8 +57,8 @@ observe(subject)                          leader fetches + reduces subject to a 
                                         -> admitted only when signatures agree unanimously
                                         -> any disagreement aborts the round: nothing is admitted
 
-report_equivocation(subject, who, what)  a separate, committee-gated transaction that records
-                                        a divergent signature and attributes it to an address
+report_equivocation(subject, label, what) a separate, committee-gated transaction that records
+                                        a divergent signature under a reporter-supplied label
 ```
 
 Key methods: `observe`, `get_observation`, `get_equivocations`, `equivocation_count`,
@@ -71,7 +75,7 @@ Key methods: `observe`, `get_observation`, `get_equivocations`, `equivocation_co
 | `equivocation_count[subject]` | Total attributed equivocations for the subject |
 | `quarantined[address]` | Set once an address reaches `quarantine_threshold` |
 
-Subjects are `evm:<0x tx hash>`, normalised to lowercase. Only EVM transactions are accepted —
+Subjects are `evm:<0x tx hash>`, normalised to lowercase. Only EVM transactions are accepted;
 see *Limitations*.
 
 ---
@@ -106,7 +110,7 @@ The full argument, written to be disputed, is in **[`docs/CONSENSUS.md`](docs/CO
 `confirmations` and `logsBloom` are worth calling out: `logsBloom` is a rolling hash over the whole
 block, so it changes for every transaction in the block including unrelated ones.
 
-**Banded** — keep the bucket, discard the measurement:
+**Banded.** Keep the bucket, discard the measurement:
 
 | Quantity | Bands |
 |---|---|
@@ -127,7 +131,7 @@ a collision invitation on the one field the primitive exists to protect.
 
 ## Worked example
 
-A real, long-settled Base Sepolia transaction — an ERC-20 transfer at block 46400000.
+A real, long-settled Base Sepolia transaction: an ERC-20 transfer at block 46400000.
 
 ```
 subject : evm:0x919c3f9906382255a9acc19b350c900784dcff164ea30e5fd6a6f3df00283e5a
@@ -141,7 +145,7 @@ Read it: found, succeeded, called `0x5f92…2e97` via selector `0xac9650d8`, emi
 topics (neither repeated), value band `ZERO`, gas band `HIGH`, two logs → `FEW`.
 
 Notice what is **not** there: block 46400000, `gasUsed` 703310, any timestamp, any gas price.
-`gasUsed` 703310 is what put `HIGH` there — the number is gone, the band remains. That is the
+`gasUsed` 703310 is what put `HIGH` there. The number is gone, the band remains. That is the
 whole design in one line.
 
 Now the divergence. `scripts/observe.py --report-harness` submits an artifact with
@@ -163,11 +167,11 @@ Anyone can re-derive that digest off-chain. Regenerate the artifact and check it
 # -> OK  the recorded signature is reproducible from the stored artifact
 ```
 
-The artifact is **not** committed — a reviewer should reproduce it, not receive it. `verify_artifact.py`
+The artifact is **not** committed. A reviewer should reproduce it, not receive it. `verify_artifact.py`
 reads whatever `observe.py` last wrote, so the two must be run in that order.
 
 > **The on-chain equivocation is a test harness, not a real adversarial event.** It was produced
-> by deliberately corrupting a fetch. No validator misbehaved. See *Limitations* — a real one
+> by deliberately corrupting a fetch. No validator misbehaved. See *Limitations*: a real one
 > cannot currently be produced at all.
 
 ---
@@ -203,7 +207,7 @@ The full hermetic suite:
 Stated plainly. The first three are protocol limits, not oversights.
 
 1. **Concord cannot prove which validator equivocated.** It can prove *that* a signature
-   diverges — unanimously — but not *who* produced it. Two independent reasons:
+   diverges, unanimously, but not *who* produced it. Two independent reasons:
    `run_nondet_unsafe` terminates the VM when a validator votes `False`, rolling back every
    write including any record; and GenVM consensus requires byte-identical state from all
    validators, so per-validator values cannot be written at all. GenVM also exposes no validator
@@ -221,11 +225,11 @@ Stated plainly. The first three are protocol limits, not oversights.
 4. **Bands are coarse.** 40 logs and 200 logs both read `MANY`. Costs resolution, never safety.
 
 5. **EVM transactions only.** A general web-resource subject would need its own stability argument
-   per URL. BRIEF.md §6 question 3, resolved to the narrower option.
+   per URL. Resolved to the narrower option deliberately.
 
 6. **One public endpoint, one chain.** `evm_rpc_url` is fixed at deploy time and reported by
-   `stats()`. If that endpoint is down, observations degrade to the `HTTP_…` digest — consistently
-   across nodes, so they still agree, but the observation is not about the subject.
+   `stats()`. If that endpoint is down, observations degrade to the `HTTP_…` digest. That is
+   consistent across nodes, so they still agree, but the observation is not about the subject.
 
 7. **Not used in production.** It is not. No protocol depends on it.
 
@@ -245,7 +249,7 @@ Full record with error text in [`state/LEFT-OFF.md`](state/LEFT-OFF.md). The fou
 - **A defect found on chain, not in review.** The first deployed version truncated the
   equivocation artifact at 6000 characters. A real Base Sepolia receipt is ~14.7 KB, so the
   truncated prefix did not parse, reduced to the `UNPARSEABLE` not-found digest, and the chain
-  recorded *that* as the "divergent signature" — blaming a validator for the reporter's upload
+  recorded *that* as the "divergent signature", blaming a validator for the reporter's upload
   size. The signature was reproducible from the artifact, so no check caught it; only comparing
   it against the digest the corrupted field *should* produce did. Truncation is now an outright
   rejection, with a regression test.
@@ -253,19 +257,19 @@ Full record with error text in [`state/LEFT-OFF.md`](state/LEFT-OFF.md). The fou
 - **A `UnicodeDecodeError` that was really a request-encoding bug.** Hand-rolling `gen_call`
   calldata with `{"method": …, "args": [], "kwargs": {}}` looks right and is wrong:
   `make_calldata_object` *omits* empty `args`/`kwargs`. The node accepts the malformed calldata
-  and returns a result the decoder cannot read — surfacing as
+  and returns a result the decoder cannot read, surfacing as
   `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc4 in position 35`, which reads as corrupt
   chain data. Cost several wrong hypotheses before the payloads were diffed byte for byte.
 
 - **Two contract bugs the tests caught, not review.** `set_quarantine_limit` was documented
-  owner-only and had no owner check — found by a test asserting a non-owner is rejected, which
+  owner-only and had no owner check. Found by a test asserting a non-owner is rejected, which
   failed to raise. And the calldata selector was sliced `raw_input[2:10]`, dropping the `0x` and
   returning six hex characters instead of eight.
 
-- **`genlayer-py` did *not* have the reported read defect.** `../mys/state/MEMORY.md` records
-  that 0.18.0 reports `Contract 0x… not found` for a live Studionet contract that `genlayer-js`
-  reads. That did not reproduce here — `gen_call` decodes correctly on 0.18.0 for this address.
-  Recorded as unreproduced, not fixed.
+- **`genlayer-py` did *not* have the reported read defect.** A sibling project recorded that 0.18.0
+  reports `Contract 0x... not found` for a live Studionet contract that `genlayer-js` reads. That
+  did not reproduce here: `gen_call` decodes correctly on 0.18.0 for this address. Recorded as
+  unreproduced, not fixed.
 
 ---
 
@@ -288,7 +292,7 @@ Two virtualenvs, deliberately. `.venv` (`genlayer-test` 0.28.0, which pins `genl
 runs the tests. `.venv-deploy` (`genlayer-py` 0.18.0) deploys and verifies. They are not
 interchangeable.
 
-`.env` is gitignored and has never been committed. No environment value — including public
-endpoints — appears anywhere in this repository, in any script's output, or in any error message;
+`.env` is gitignored and has never been committed. No environment value, including public
+endpoints, appears anywhere in this repository, in any script's output, or in any error message;
 `verify_live.py` sanitises the endpoint out of every exception it catches, because
 `genlayer-py`'s provider embeds it in its own error text.

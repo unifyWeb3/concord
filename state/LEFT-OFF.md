@@ -1,4 +1,4 @@
-# Left off — next action
+# Left off: next action
 
 Updated 2026-10-03. Project: **Concord**, a GenLayer Intelligent Contract primitive.
 
@@ -8,16 +8,16 @@ Updated 2026-10-03. Project: **Concord**, a GenLayer Intelligent Contract primit
 |---|---|
 | Contract | `0x7c01a7c38c04f4BE6f66a967a5EaB26f73c48F87` (EIP-55) |
 | Explorer | <https://explorer-studio.genlayer.com/address/0x7c01a7c38c04f4BE6f66a967a5EaB26f73c48F87> |
-| Deploy tx | `0xd8c03ca8f077182a104c667e162daa8fef7260519bae2885be11d713eee4d4ec` — FINALIZED, `MAJORITY_AGREE` |
-| Admitted observation tx | `0xb0a917626fe501eb2a70bfff981c483d702072075f8dddd61921adf36168172c` — FINALIZED |
-| Equivocation record tx | `0x03b29a6d2fcc694f9c8acb83e8305fbc8d97277fc10b18909371f493c9e97527` — FINALIZED
-Second record tx | `0x2274320c9263f346656789fc6ffdf7172f4bf090c9271e954503501d370a6581` — FINALIZED |
+| Deploy tx | `0xd8c03ca8...4d4ec`, FINALIZED, `MAJORITY_AGREE` |
+| Admitted observation tx | `0xb0a91762...8172c`, FINALIZED |
+| Equivocation record tx | `0x03b29a6d...e97527`, FINALIZED |
+Second record tx | `0x2274320c...a6581`, FINALIZED |
 | Admitted signature | `66ae60fa7a112ae0ca54f025f40c57dc346528aed674746c3133d1d68e01e54d` |
 | Divergent signature | `173664f45f52567485456cd2eea29e6b4a644ccf04e4aca4d7be9ad3bbc3bac2` |
 
 An earlier deployment, `0x5d115AF0a0E18Bc2CACBC333872Ad5530b799786` (deploy tx
 `0x7b82529da4ccbb5e3f95b26d830a1d188df1c29b44c1ae7a3085d74382f1f8b7`), carries a **known-defective**
-equivocation record — see "Defect found on chain" below. It is superseded and should be treated as
+equivocation record, see "Defect found on chain" below. It is superseded and should be treated as
 a counter-example, not as a demo.
 
 ## Checks, all re-runnable
@@ -56,7 +56,7 @@ tests, `.venv-deploy` (`genlayer-py` 0.18.0) for deploy and verify. Not intercha
 5. **Not used in production.** It is not.
 6. **Never print, log or commit any `.env` value, public endpoints included.** Absolute.
    `verify_live.py` sanitises the endpoint out of every exception it catches, because
-   `genlayer-py`'s provider embeds it in its own error text — confirmed, see below.
+   `genlayer-py`'s provider embeds it in its own error text, confirmed below.
 
 ## Do not
 
@@ -73,7 +73,7 @@ tests, `.venv-deploy` (`genlayer-py` 0.18.0) for deploy and verify. Not intercha
 
 ## What did not work, with the actual error text
 
-### 1. Defect found on chain, not in review — artifact truncation
+### 1. Defect found on chain, not in review: artifact truncation
 
 The first deployed version truncated the equivocation artifact at `MAX_ARTIFACT_CHARS = 6000`. A
 real Base Sepolia receipt is ~14.7 KB (`artifacts/harness_equivocation_artifact.json`, 14691 bytes).
@@ -84,7 +84,7 @@ json.decoder.JSONDecodeError: Unterminated string starting at: line 1 column 112
 ```
 
 so it reduced to the `UNPARSEABLE` not-found digest, and **the chain recorded that as the
-"divergent signature"** — attributed to a validator, when what actually happened was that the
+"divergent signature"**, attributed to a validator, when what actually happened was that the
 reporter's upload was too big:
 
 ```
@@ -180,7 +180,7 @@ requests.exceptions.ConnectionError: HTTPSConnectionPool(host=...): Max retries 
 
 Cause: the network path from this host to the GenLayer node. `verify_live.py` retries with backoff
 and reports it as a transport failure, never as a contract failure. Same class of defect as
-`../mys`'s recurring "a call that reports a result contradicting reality".
+A sibling project's recurring "a call that reports a result contradicting reality".
 
 ### 6. A second, independent equivocation record on chain
 
@@ -197,12 +197,12 @@ per-address attribution rather than a single running total.
 
 **Both are manufactured.** Same rule as the first: deliberately corrupted fetch, labelled, not
 evidence of a byzantine node. Run to prove attribution is per-address and that a second, different
-divergence is recorded independently — not to claim a real adversarial event.
+divergence is recorded independently, not to claim a real adversarial event.
 
 ### 7. `genlayer-py` did **not** have the reported live-read defect
 
-`../mys/state/MEMORY.md` records genlayer-py 0.18.0 reporting `Contract 0x… not found` for a live
-Studionet contract that `genlayer-js` reads — reproduced twice there. That did **not** reproduce
+A sibling project records genlayer-py 0.18.0 reporting `Contract 0x... not found` for a live
+Studionet contract that `genlayer-js` reads, reproduced twice there. That did **not** reproduce
 here: `gen_call` against `0x7c01a7c3…` decodes correctly on 0.18.0. Recorded as **unreproduced**,
 not fixed. Cross-check with a second client before believing either report.
 
@@ -218,7 +218,7 @@ not fixed. Cross-check with a second client before believing either report.
    requires a byzantine node, and per claim (1) the resulting transaction could not record
    anything anyway.
 
-## Open questions from BRIEF.md §6, as resolved
+## Open questions from the build spec, as resolved
 
 All three resolved to the narrower/safer option, with the reasoning in the README and
 `docs/CONSENSUS.md`:
@@ -226,7 +226,7 @@ All three resolved to the narrower/safer option, with the reasoning in the READM
 | Question | Resolved | Why |
 |---|---|---|
 | `observe` permissionless or owner-gated? | **Permissionless** | A gated primitive is not a primitive. `set_quarantine_limit` is the only owner-gated method. |
-| Quarantine or record only? | **Both** | Recorded, counted, and flagged at a threshold. Enforcement is out of scope — Concord cannot influence validator selection. |
+| Quarantine or record only? | **Both** | Recorded, counted, and flagged at a threshold. Enforcement is out of scope, since Concord cannot influence validator selection. |
 | EVM transaction only, or general web? | **EVM only** | A web subject needs its own stability argument per URL. Narrower is finishable and arguable. |
 
 Additional assumption not in the brief: **the chain is fixed by `evm_rpc_url` at deploy time, not

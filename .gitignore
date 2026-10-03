@@ -28,3 +28,6 @@ gltest-results/
 # scripts/observe.py --report-harness. Not delivery content -- a reviewer should reproduce
 # it, not receive it. See state/LEFT-OFF.md and docs/CONSENSUS.md section 6.
 artifacts/
+
+# internal build spec, not delivery content; kept on disk for the build agent
+BRIEF.md
